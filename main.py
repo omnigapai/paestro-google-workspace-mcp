@@ -75,7 +75,7 @@ def main():
     parser.add_argument('--single-user', action='store_true',
                         help='Run in single-user mode - bypass session mapping and use any credentials from the credentials directory')
     parser.add_argument('--tools', nargs='*',
-                        choices=['gmail', 'drive', 'calendar', 'docs', 'sheets', 'chat', 'forms', 'slides', 'tasks', 'search'],
+                        choices=['gmail', 'drive', 'calendar', 'docs', 'sheets', 'chat', 'forms', 'slides', 'tasks', 'search', 'contacts'],
                         help='Specify which tools to register. If not provided, all tools are registered.')
     parser.add_argument('--tool-tier', choices=['core', 'extended', 'complete'],
                         help='Load tools based on tier level. Can be combined with --tools to filter services.')
@@ -140,7 +140,8 @@ def main():
         'forms': lambda: __import__('gforms.forms_tools'),
         'slides': lambda: __import__('gslides.slides_tools'),
         'tasks': lambda: __import__('gtasks.tasks_tools'),
-        'search': lambda: __import__('gsearch.search_tools')
+        'search': lambda: __import__('gsearch.search_tools'),
+        'contacts': lambda: __import__('gcontacts.contacts_tools')
     }
 
     tool_icons = {
@@ -153,7 +154,8 @@ def main():
         'forms': '📝',
         'slides': '🖼️',
         'tasks': '✓',
-        'search': '🔍'
+        'search': '🔍',
+        'contacts': '👥'
     }
 
     # Determine which tools to import based on arguments

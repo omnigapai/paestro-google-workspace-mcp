@@ -60,6 +60,12 @@ TASKS_READONLY_SCOPE = 'https://www.googleapis.com/auth/tasks.readonly'
 # Google Custom Search API scope
 CUSTOM_SEARCH_SCOPE = 'https://www.googleapis.com/auth/cse'
 
+# Google People API scopes (Contacts)
+CONTACTS_READONLY_SCOPE = 'https://www.googleapis.com/auth/contacts.readonly'
+CONTACTS_SCOPE = 'https://www.googleapis.com/auth/contacts'
+CONTACTS_OTHER_READONLY_SCOPE = 'https://www.googleapis.com/auth/contacts.other.readonly'
+DIRECTORY_READONLY_SCOPE = 'https://www.googleapis.com/auth/directory.readonly'
+
 # Base OAuth scopes required for user identification
 BASE_SCOPES = [
     USERINFO_EMAIL_SCOPE,
@@ -124,6 +130,13 @@ CUSTOM_SEARCH_SCOPES = [
     CUSTOM_SEARCH_SCOPE
 ]
 
+CONTACTS_SCOPES = [
+    CONTACTS_SCOPE,
+    CONTACTS_READONLY_SCOPE,
+    CONTACTS_OTHER_READONLY_SCOPE,
+    DIRECTORY_READONLY_SCOPE
+]
+
 # Tool-to-scopes mapping
 TOOL_SCOPES_MAP = {
     'gmail': GMAIL_SCOPES,
@@ -135,7 +148,8 @@ TOOL_SCOPES_MAP = {
     'forms': FORMS_SCOPES,
     'slides': SLIDES_SCOPES,
     'tasks': TASKS_SCOPES,
-    'search': CUSTOM_SEARCH_SCOPES
+    'search': CUSTOM_SEARCH_SCOPES,
+    'contacts': CONTACTS_SCOPES
 }
 
 def set_enabled_tools(enabled_tools):

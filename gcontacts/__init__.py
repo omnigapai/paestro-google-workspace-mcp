@@ -1,0 +1,1 @@
+# This file marks the 'gcontacts' directory as a Python package.
