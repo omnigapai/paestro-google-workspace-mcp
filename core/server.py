@@ -158,8 +158,21 @@ async def calendar_google_connect(request: Request):
         # Generate OAuth state with coach ID
         oauth_state = f"{coach_id}-{os.urandom(8).hex()}"
         
-        # Use the redirect_uri from config, not from query params for security
-        redirect_uri = get_oauth_redirect_uri()
+        # Use frontend's redirect_uri if provided and valid, otherwise use default
+        # This is needed for localhost development where frontend runs on different port
+        allowed_redirect_uris = [
+            "http://localhost:8080/oauth-callback",
+            "http://localhost:5173/oauth-callback",
+            "https://googleworkspacemcp-production-6c89.up.railway.app/oauth/callback",
+            get_oauth_redirect_uri()
+        ]
+        
+        if redirect_uri_param and redirect_uri_param in allowed_redirect_uris:
+            redirect_uri = redirect_uri_param
+            logger.info(f"Using frontend-provided redirect_uri: {redirect_uri}")
+        else:
+            redirect_uri = get_oauth_redirect_uri()
+            logger.info(f"Using default redirect_uri: {redirect_uri}")
         
         # Create OAuth flow
         from auth.google_auth import create_oauth_flow
