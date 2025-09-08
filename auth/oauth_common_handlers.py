@@ -163,6 +163,42 @@ async def handle_proxy_token_exchange(request: Request):
                                         # Store the token session with MCP session binding
                                         session_id = store_token_session(response_data, user_email, mcp_session_id)
                                         logger.info(f"Stored OAuth session for {user_email} (session: {session_id}, mcp: {mcp_session_id})")
+                                        
+                                        # Also store tokens in Main MCP's Supabase for enterprise scale
+                                        # Check if we have coach info in the request (passed from Orchestrator)
+                                        try:
+                                            # Try to extract coach info from request state or query params
+                                            coach_id = None
+                                            coach_email = user_email  # Default to the authenticated email
+                                            
+                                            # Check if request has state with coach info
+                                            if hasattr(request, 'state') and hasattr(request.state, 'coach_id'):
+                                                coach_id = request.state.coach_id
+                                            
+                                            # If we have coach_id, store tokens in Main MCP
+                                            if coach_id:
+                                                from core.inter_service_client import InterServiceClient
+                                                import asyncio
+                                                
+                                                async def store_in_main_mcp():
+                                                    async with InterServiceClient() as client:
+                                                        result = await client.store_oauth_tokens(
+                                                            tokens=response_data,
+                                                            coach_id=coach_id,
+                                                            coach_email=coach_email
+                                                        )
+                                                        if result.get('success'):
+                                                            logger.info(f"Stored OAuth tokens in Main MCP for coach {coach_id}")
+                                                        else:
+                                                            logger.warning(f"Failed to store tokens in Main MCP: {result.get('error')}")
+                                                
+                                                # Run the async storage in background
+                                                asyncio.create_task(store_in_main_mcp())
+                                            else:
+                                                logger.debug("No coach_id available, skipping Main MCP storage")
+                                                
+                                        except Exception as e:
+                                            logger.warning(f"Could not store tokens in Main MCP: {e}")
 
                                         # Also create and store Google credentials
                                         expiry = None

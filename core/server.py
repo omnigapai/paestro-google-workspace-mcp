@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Optional, Union
 from importlib import metadata
 
@@ -128,6 +129,59 @@ async def health_check(request: Request):
         "version": version,
         "transport": get_transport_mode()
     })
+
+@server.custom_route("/calendar/google/connect", methods=["GET"])
+async def calendar_google_connect(request: Request):
+    """
+    Initiate Google OAuth flow for calendar access.
+    Returns HTTP 302 redirect to Google's OAuth consent screen.
+    """
+    from fastapi import HTTPException
+    from fastapi.responses import RedirectResponse
+    from auth.oauth_config import get_oauth_redirect_uri
+    
+    # Extract parameters
+    coach_id = request.query_params.get("coachId")
+    redirect_uri_param = request.query_params.get("redirect_uri")
+    
+    if not coach_id:
+        raise HTTPException(status_code=400, detail="coachId parameter is required")
+    
+    logger.info(f"Initiating Google OAuth flow for coach: {coach_id}")
+    
+    try:
+        # Check client secrets
+        error_message = check_client_secrets()
+        if error_message:
+            raise HTTPException(status_code=500, detail=error_message)
+        
+        # Generate OAuth state with coach ID
+        oauth_state = f"{coach_id}-{os.urandom(8).hex()}"
+        
+        # Use the redirect_uri from config, not from query params for security
+        redirect_uri = get_oauth_redirect_uri()
+        
+        # Create OAuth flow
+        from auth.google_auth import create_oauth_flow
+        from auth.scopes import get_current_scopes
+        
+        flow = create_oauth_flow(
+            scopes=get_current_scopes(),
+            redirect_uri=redirect_uri,
+            state=oauth_state
+        )
+        
+        # Generate authorization URL
+        auth_url, _ = flow.authorization_url(access_type="offline", prompt="consent")
+        
+        logger.info(f"Redirecting coach {coach_id} to Google OAuth: {auth_url}")
+        
+        # Return HTTP 302 redirect to Google's consent screen
+        return RedirectResponse(url=auth_url, status_code=302)
+        
+    except Exception as e:
+        logger.error(f"Error initiating OAuth flow for coach {coach_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to initiate OAuth flow: {str(e)}")
 
 @server.custom_route("/oauth2callback", methods=["GET"])
 async def oauth2_callback(request: Request) -> HTMLResponse:

@@ -136,6 +136,95 @@ async def oauth_token(request: Request):
 async def oauth_register(request: Request):
     return await handle_oauth_register(request)
 
+# Enterprise endpoint for Orchestrator with coach info
+@server.custom_route("/oauth/exchange", methods=["POST", "OPTIONS"])
+async def oauth_exchange_with_coach(request: Request):
+    """Handle OAuth token exchange with coach info from Orchestrator"""
+    from auth.oauth_common_handlers import handle_proxy_token_exchange
+    from core.inter_service_client import InterServiceClient
+    import json
+    
+    # Handle CORS preflight
+    if request.method == "OPTIONS":
+        return JSONResponse(content={}, headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type"
+        })
+    
+    try:
+        # Get the request body
+        body = await request.body()
+        data = json.loads(body) if body else {}
+        
+        # Extract coach info from Orchestrator
+        coach_id = data.get('coachId')
+        coach_email = data.get('coachEmail')
+        code = data.get('code')
+        redirect_uri = data.get('redirectUri', 'http://localhost:8080/oauth-callback')
+        
+        if not code:
+            return JSONResponse(
+                content={"success": False, "error": "Missing authorization code"},
+                status_code=400
+            )
+        
+        # Exchange code for tokens with Google
+        import aiohttp
+        from urllib.parse import urlencode
+        
+        token_data = {
+            'code': code,
+            'client_id': os.getenv("GOOGLE_OAUTH_CLIENT_ID"),
+            'client_secret': os.getenv("GOOGLE_OAUTH_CLIENT_SECRET"),
+            'redirect_uri': redirect_uri,
+            'grant_type': 'authorization_code'
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                "https://oauth2.googleapis.com/token",
+                data=urlencode(token_data),
+                headers={"Content-Type": "application/x-www-form-urlencoded"}
+            ) as response:
+                tokens = await response.json()
+                
+                if response.status != 200:
+                    logger.error(f"Token exchange failed: {response.status} - {tokens}")
+                    return JSONResponse(
+                        content={"success": False, "error": "Token exchange failed", "details": tokens},
+                        status_code=response.status
+                    )
+                
+                # Store tokens in Main MCP if we have coach info
+                if coach_id and coach_email:
+                    async with InterServiceClient() as client:
+                        storage_result = await client.store_oauth_tokens(
+                            tokens=tokens,
+                            coach_id=coach_id,
+                            coach_email=coach_email
+                        )
+                        
+                        if storage_result.get('success'):
+                            logger.info(f"Stored OAuth tokens in Main MCP for coach {coach_id}")
+                        else:
+                            logger.warning(f"Failed to store tokens in Main MCP: {storage_result.get('error')}")
+                
+                return JSONResponse(
+                    content={
+                        "success": True,
+                        "data": tokens,
+                        "message": "OAuth tokens obtained and stored successfully"
+                    }
+                )
+                
+    except Exception as e:
+        logger.error(f"OAuth exchange error: {str(e)}")
+        return JSONResponse(
+            content={"success": False, "error": str(e)},
+            status_code=500
+        )
+
 # Export server instance for FastMCP CLI (looks for 'mcp', 'server', or 'app')
 mcp = server
 app = server
