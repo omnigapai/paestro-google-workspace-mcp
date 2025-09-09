@@ -135,7 +135,7 @@ def main():
         'drive': lambda: __import__('gdrive.drive_tools'),
         'calendar': lambda: __import__('gcalendar.calendar_tools'),
         'docs': lambda: __import__('gdocs.docs_tools'),
-        'sheets': lambda: (__import__('gsheets.sheets_tools'), __import__('gsheets.sheets_contacts')),
+        'sheets': lambda: __import__('gsheets.sheets_tools'),
         'chat': lambda: __import__('gchat.chat_tools'),
         'forms': lambda: __import__('gforms.forms_tools'),
         'slides': lambda: __import__('gslides.slides_tools'),
