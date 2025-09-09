@@ -406,14 +406,15 @@ class SheetsContactManager:
         return False
 
 
-# MCP Tool handlers for the Google Workspace MCP server
+# HTTP Route handlers for the Google Workspace MCP server
 
-@server.tool()
-async def sheets_contacts_list(
-    coach_id: str,
-    session: Optional[str] = None
-) -> Dict[str, Any]:
+@server.custom_route("/sheets-contacts/list", ["POST"])
+async def sheets_contacts_list(request):
     """Get all contacts from coach's Google Sheet"""
+    import json
+    data = json.loads(request.body) if request.body else {}
+    coach_id = data.get('coach_id')
+    session = data.get('session')
     from auth.session_manager import get_credentials_for_coach
     
     try:
@@ -444,13 +445,14 @@ async def sheets_contacts_list(
         }
 
 
-@server.tool()
-async def sheets_contacts_add(
-    coach_id: str,
-    contact_data: Dict[str, Any],
-    session: Optional[str] = None
-) -> Dict[str, Any]:
+@server.custom_route("/sheets-contacts/add", ["POST"])
+async def sheets_contacts_add(request):
     """Add a new contact to coach's Google Sheet"""
+    import json
+    data = json.loads(request.body) if request.body else {}
+    coach_id = data.get('coach_id')
+    contact_data = data.get('contact_data', {})
+    session = data.get('session')
     from auth.session_manager import get_credentials_for_coach
     
     try:
@@ -480,14 +482,15 @@ async def sheets_contacts_add(
         }
 
 
-@server.tool()
-async def sheets_contacts_update(
-    coach_id: str,
-    contact_id: str,
-    updates: Dict[str, Any],
-    session: Optional[str] = None
-) -> Dict[str, Any]:
+@server.custom_route("/sheets-contacts/update", ["POST"])
+async def sheets_contacts_update(request):
     """Update a contact in coach's Google Sheet"""
+    import json
+    data = json.loads(request.body) if request.body else {}
+    coach_id = data.get('coach_id')
+    contact_id = data.get('contact_id')
+    updates = data.get('updates', {})
+    session = data.get('session')
     from auth.session_manager import get_credentials_for_coach
     
     try:
@@ -517,13 +520,14 @@ async def sheets_contacts_update(
         }
 
 
-@server.tool()
-async def sheets_contacts_delete(
-    coach_id: str,
-    contact_id: str,
-    session: Optional[str] = None
-) -> Dict[str, Any]:
+@server.custom_route("/sheets-contacts/delete", ["POST"])
+async def sheets_contacts_delete(request):
     """Delete a contact from coach's Google Sheet"""
+    import json
+    data = json.loads(request.body) if request.body else {}
+    coach_id = data.get('coach_id')
+    contact_id = data.get('contact_id')
+    session = data.get('session')
     from auth.session_manager import get_credentials_for_coach
     
     try:
@@ -552,13 +556,14 @@ async def sheets_contacts_delete(
         }
 
 
-@server.tool()
-async def sheets_contacts_init(
-    coach_id: str,
-    sheet_name: Optional[str] = None,
-    session: Optional[str] = None
-) -> Dict[str, Any]:
+@server.custom_route("/sheets-contacts/init", ["POST"])
+async def sheets_contacts_init(request):
     """Initialize Google Sheet for coach's contacts"""
+    import json
+    data = json.loads(request.body) if request.body else {}
+    coach_id = data.get('coach_id')
+    sheet_name = data.get('sheet_name')
+    session = data.get('session')
     from auth.session_manager import get_credentials_for_coach
     
     try:
@@ -611,13 +616,14 @@ async def sheets_contacts_init(
         }
 
 
-@server.tool()
-async def sheets_contacts_sync(
-    coach_id: str,
-    dashboard_contacts: Optional[List[Dict[str, Any]]] = None,
-    session: Optional[str] = None
-) -> Dict[str, Any]:
+@server.custom_route("/sheets-contacts/sync", ["POST"])
+async def sheets_contacts_sync(request):
     """Sync contacts between dashboard and Google Sheets"""
+    import json
+    data = json.loads(request.body) if request.body else {}
+    coach_id = data.get('coach_id')
+    dashboard_contacts = data.get('dashboard_contacts')
+    session = data.get('session')
     from auth.session_manager import get_credentials_for_coach
     
     try:
@@ -660,5 +666,5 @@ async def sheets_contacts_sync(
         }
 
 
-# Register all endpoints
-logger.info("Google Sheets contact management system initialized")
+# Register all HTTP routes
+logger.info("Google Sheets contact management HTTP routes initialized")
