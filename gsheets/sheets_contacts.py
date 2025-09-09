@@ -415,10 +415,21 @@ async def sheets_contacts_list(request):
     data = json.loads(request.body) if request.body else {}
     coach_id = data.get('coach_id')
     session = data.get('session')
-    from auth.session_manager import get_credentials_for_coach
+    from auth.oauth21_session_store import OAuth21SessionStore
     
     try:
-        credentials = get_credentials_for_coach(coach_id)
+        # Get session ID from headers
+        session_id = request.headers.get('session-id')
+        if not session_id:
+            return {
+                'success': False,
+                'error': 'No session ID provided',
+                'requiresAuth': True
+            }
+        
+        # Get credentials from session store
+        store = OAuth21SessionStore()
+        credentials = store.get_credentials_by_mcp_session(session_id)
         if not credentials:
             return {
                 'success': False,
@@ -453,10 +464,21 @@ async def sheets_contacts_add(request):
     coach_id = data.get('coach_id')
     contact_data = data.get('contact_data', {})
     session = data.get('session')
-    from auth.session_manager import get_credentials_for_coach
+    from auth.oauth21_session_store import OAuth21SessionStore
     
     try:
-        credentials = get_credentials_for_coach(coach_id)
+        # Get session ID from headers
+        session_id = request.headers.get('session-id')
+        if not session_id:
+            return {
+                'success': False,
+                'error': 'No session ID provided',
+                'requiresAuth': True
+            }
+        
+        # Get credentials from session store
+        store = OAuth21SessionStore()
+        credentials = store.get_credentials_by_mcp_session(session_id)
         if not credentials:
             return {
                 'success': False,
@@ -491,10 +513,21 @@ async def sheets_contacts_update(request):
     contact_id = data.get('contact_id')
     updates = data.get('updates', {})
     session = data.get('session')
-    from auth.session_manager import get_credentials_for_coach
+    from auth.oauth21_session_store import OAuth21SessionStore
     
     try:
-        credentials = get_credentials_for_coach(coach_id)
+        # Get session ID from headers
+        session_id = request.headers.get('session-id')
+        if not session_id:
+            return {
+                'success': False,
+                'error': 'No session ID provided',
+                'requiresAuth': True
+            }
+        
+        # Get credentials from session store
+        store = OAuth21SessionStore()
+        credentials = store.get_credentials_by_mcp_session(session_id)
         if not credentials:
             return {
                 'success': False,
@@ -528,10 +561,21 @@ async def sheets_contacts_delete(request):
     coach_id = data.get('coach_id')
     contact_id = data.get('contact_id')
     session = data.get('session')
-    from auth.session_manager import get_credentials_for_coach
+    from auth.oauth21_session_store import OAuth21SessionStore
     
     try:
-        credentials = get_credentials_for_coach(coach_id)
+        # Get session ID from headers
+        session_id = request.headers.get('session-id')
+        if not session_id:
+            return {
+                'success': False,
+                'error': 'No session ID provided',
+                'requiresAuth': True
+            }
+        
+        # Get credentials from session store
+        store = OAuth21SessionStore()
+        credentials = store.get_credentials_by_mcp_session(session_id)
         if not credentials:
             return {
                 'success': False,
@@ -564,10 +608,21 @@ async def sheets_contacts_init(request):
     coach_id = data.get('coach_id')
     sheet_name = data.get('sheet_name')
     session = data.get('session')
-    from auth.session_manager import get_credentials_for_coach
+    from auth.oauth21_session_store import OAuth21SessionStore
     
     try:
-        credentials = get_credentials_for_coach(coach_id)
+        # Get session ID from headers
+        session_id = request.headers.get('session-id')
+        if not session_id:
+            return {
+                'success': False,
+                'error': 'No session ID provided',
+                'requiresAuth': True
+            }
+        
+        # Get credentials from session store
+        store = OAuth21SessionStore()
+        credentials = store.get_credentials_by_mcp_session(session_id)
         if not credentials:
             return {
                 'success': False,
@@ -624,10 +679,21 @@ async def sheets_contacts_sync(request):
     coach_id = data.get('coach_id')
     dashboard_contacts = data.get('dashboard_contacts')
     session = data.get('session')
-    from auth.session_manager import get_credentials_for_coach
+    from auth.oauth21_session_store import OAuth21SessionStore
     
     try:
-        credentials = get_credentials_for_coach(coach_id)
+        # Get session ID from headers
+        session_id = request.headers.get('session-id')
+        if not session_id:
+            return {
+                'success': False,
+                'error': 'No session ID provided',
+                'requiresAuth': True
+            }
+        
+        # Get credentials from session store
+        store = OAuth21SessionStore()
+        credentials = store.get_credentials_by_mcp_session(session_id)
         if not credentials:
             return {
                 'success': False,
