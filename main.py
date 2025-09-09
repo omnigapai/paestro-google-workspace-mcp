@@ -199,6 +199,86 @@ def main():
 
     # Filter tools based on tier configuration (if tier-based loading is enabled)
     filter_server_tools(server)
+    
+    # Add OAuth exchange endpoint for Orchestrator
+    if args.transport == 'streamable-http':
+        from fastapi.responses import JSONResponse
+        from starlette.requests import Request
+        import json
+        import aiohttp
+        from urllib.parse import urlencode
+        
+        @server.custom_route("/oauth/exchange", methods=["POST", "OPTIONS"])
+        async def oauth_exchange_with_coach(request: Request):
+            """Handle OAuth token exchange with coach info from Orchestrator"""
+            
+            # Handle CORS preflight
+            if request.method == "OPTIONS":
+                return JSONResponse(content={}, headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "POST, OPTIONS",
+                    "Access-Control-Allow-Headers": "Content-Type"
+                })
+            
+            try:
+                # Get the request body
+                body = await request.body()
+                data = json.loads(body) if body else {}
+                
+                # Extract coach info from Orchestrator
+                coach_id = data.get('coachId')
+                coach_email = data.get('coachEmail')
+                code = data.get('code')
+                redirect_uri = data.get('redirectUri', f"{os.getenv('WORKSPACE_MCP_BASE_URI', 'http://localhost:8080')}/oauth-callback")
+                
+                if not code:
+                    return JSONResponse(
+                        content={"success": False, "error": "Missing authorization code"},
+                        status_code=400
+                    )
+                
+                # Exchange code for tokens with Google
+                token_data = {
+                    'code': code,
+                    'client_id': os.getenv("GOOGLE_OAUTH_CLIENT_ID"),
+                    'client_secret': os.getenv("GOOGLE_OAUTH_CLIENT_SECRET"),
+                    'redirect_uri': redirect_uri,
+                    'grant_type': 'authorization_code'
+                }
+                
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(
+                        "https://oauth2.googleapis.com/token",
+                        data=urlencode(token_data),
+                        headers={"Content-Type": "application/x-www-form-urlencoded"}
+                    ) as response:
+                        tokens = await response.json()
+                        
+                        if response.status != 200:
+                            logger.error(f"Token exchange failed: {response.status} - {tokens}")
+                            return JSONResponse(
+                                content={"success": False, "error": "Token exchange failed", "details": tokens},
+                                status_code=response.status
+                            )
+                        
+                        # Return tokens to Orchestrator
+                        return JSONResponse(
+                            content={
+                                "success": True,
+                                "access_token": tokens.get("access_token"),
+                                "refresh_token": tokens.get("refresh_token"),
+                                "expiry_date": tokens.get("expires_in"),
+                                "token_type": tokens.get("token_type", "Bearer"),
+                                "storage": "orchestrator"
+                            }
+                        )
+                        
+            except Exception as e:
+                logger.error(f"OAuth exchange error: {e}")
+                return JSONResponse(
+                    content={"success": False, "error": str(e)},
+                    status_code=500
+                )
 
     safe_print("📊 Configuration Summary:")
     safe_print(f"   🔧 Services Loaded: {len(tools_to_import)}/{len(tool_imports)}")
