@@ -163,6 +163,7 @@ async def calendar_google_connect(request: Request):
         allowed_redirect_uris = [
             "http://localhost:8080/oauth-callback",
             "http://localhost:5173/oauth-callback",
+            f"{os.getenv('WORKSPACE_MCP_BASE_URI', 'http://localhost:8080')}/oauth-callback",
             "https://googleworkspacemcp-production-6c89.up.railway.app/oauth/callback",
             get_oauth_redirect_uri()
         ]

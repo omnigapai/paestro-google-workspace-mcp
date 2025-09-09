@@ -161,7 +161,7 @@ async def oauth_exchange_with_coach(request: Request):
         coach_id = data.get('coachId')
         coach_email = data.get('coachEmail')
         code = data.get('code')
-        redirect_uri = data.get('redirectUri', 'http://localhost:8080/oauth-callback')
+        redirect_uri = data.get('redirectUri', f"{os.getenv('WORKSPACE_MCP_BASE_URI', 'http://localhost:8080')}/oauth-callback")
         
         if not code:
             return JSONResponse(
