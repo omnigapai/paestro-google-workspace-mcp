@@ -234,7 +234,12 @@ def main():
                 if not code:
                     return JSONResponse(
                         content={"success": False, "error": "Missing authorization code"},
-                        status_code=400
+                        status_code=400,
+                        headers={
+                            "Access-Control-Allow-Origin": "*",
+                            "Access-Control-Allow-Methods": "POST, OPTIONS",
+                            "Access-Control-Allow-Headers": "Content-Type"
+                        }
                     )
                 
                 # Exchange code for tokens with Google
@@ -258,7 +263,12 @@ def main():
                             logger.error(f"Token exchange failed: {response.status} - {tokens}")
                             return JSONResponse(
                                 content={"success": False, "error": "Token exchange failed", "details": tokens},
-                                status_code=response.status
+                                status_code=response.status,
+                                headers={
+                                    "Access-Control-Allow-Origin": "*",
+                                    "Access-Control-Allow-Methods": "POST, OPTIONS",
+                                    "Access-Control-Allow-Headers": "Content-Type"
+                                }
                             )
                         
                         # Return tokens to Orchestrator
@@ -270,6 +280,11 @@ def main():
                                 "expiry_date": tokens.get("expires_in"),
                                 "token_type": tokens.get("token_type", "Bearer"),
                                 "storage": "orchestrator"
+                            },
+                            headers={
+                                "Access-Control-Allow-Origin": "*",
+                                "Access-Control-Allow-Methods": "POST, OPTIONS",
+                                "Access-Control-Allow-Headers": "Content-Type"
                             }
                         )
                         
@@ -277,7 +292,12 @@ def main():
                 logger.error(f"OAuth exchange error: {e}")
                 return JSONResponse(
                     content={"success": False, "error": str(e)},
-                    status_code=500
+                    status_code=500,
+                    headers={
+                        "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Allow-Methods": "POST, OPTIONS",
+                        "Access-Control-Allow-Headers": "Content-Type"
+                    }
                 )
 
     safe_print("📊 Configuration Summary:")
