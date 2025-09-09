@@ -408,12 +408,14 @@ class SheetsContactManager:
 
 # HTTP endpoint handlers for the MCP server
 
-@server.route('/coach/<coach_id>/sheets-contacts', methods=['GET'])
-async def get_sheets_contacts(coach_id: str, request):
+@server.custom_route('/coach/{coach_id}/sheets-contacts', methods=['GET'])
+async def get_sheets_contacts(request):
     """Get all contacts from coach's Google Sheet"""
     from auth.session_manager import get_credentials_for_coach
+    from starlette.responses import JSONResponse
     
     try:
+        coach_id = request.path_params.get('coach_id')
         credentials = get_credentials_for_coach(coach_id)
         if not credentials:
             return {
@@ -441,12 +443,14 @@ async def get_sheets_contacts(coach_id: str, request):
         }
 
 
-@server.route('/coach/<coach_id>/sheets-contacts', methods=['POST'])
-async def add_sheets_contact(coach_id: str, request):
+@server.custom_route('/coach/{coach_id}/sheets-contacts', methods=['POST'])
+async def add_sheets_contact(request):
     """Add a new contact to coach's Google Sheet"""
     from auth.session_manager import get_credentials_for_coach
+    from starlette.responses import JSONResponse
     
     try:
+        coach_id = request.path_params.get('coach_id')
         credentials = get_credentials_for_coach(coach_id)
         if not credentials:
             return {
@@ -475,8 +479,8 @@ async def add_sheets_contact(coach_id: str, request):
         }
 
 
-@server.route('/coach/<coach_id>/sheets-contacts/<contact_id>', methods=['PUT'])
-async def update_sheets_contact(coach_id: str, contact_id: str, request):
+@server.custom_route('/coach/{coach_id}/sheets-contacts/{contact_id}', methods=['PUT'])
+async def update_sheets_contact(request):
     """Update a contact in coach's Google Sheet"""
     from auth.session_manager import get_credentials_for_coach
     
@@ -509,8 +513,8 @@ async def update_sheets_contact(coach_id: str, contact_id: str, request):
         }
 
 
-@server.route('/coach/<coach_id>/sheets-contacts/<contact_id>', methods=['DELETE'])
-async def delete_sheets_contact(coach_id: str, contact_id: str, request):
+@server.custom_route('/coach/{coach_id}/sheets-contacts/{contact_id}', methods=['DELETE'])
+async def delete_sheets_contact(request):
     """Delete a contact from coach's Google Sheet"""
     from auth.session_manager import get_credentials_for_coach
     
@@ -540,12 +544,14 @@ async def delete_sheets_contact(coach_id: str, contact_id: str, request):
         }
 
 
-@server.route('/coach/<coach_id>/init-sheets-contacts', methods=['POST'])
-async def init_sheets_contacts(coach_id: str, request):
+@server.custom_route('/coach/{coach_id}/init-sheets-contacts', methods=['POST'])
+async def init_sheets_contacts(request):
     """Initialize Google Sheet for coach's contacts"""
     from auth.session_manager import get_credentials_for_coach
+    from starlette.responses import JSONResponse
     
     try:
+        coach_id = request.path_params.get('coach_id')
         credentials = get_credentials_for_coach(coach_id)
         if not credentials:
             return {
@@ -598,12 +604,14 @@ async def init_sheets_contacts(coach_id: str, request):
         }
 
 
-@server.route('/coach/<coach_id>/sync-sheets-contacts', methods=['POST'])
-async def sync_sheets_contacts(coach_id: str, request):
+@server.custom_route('/coach/{coach_id}/sync-sheets-contacts', methods=['POST'])
+async def sync_sheets_contacts(request):
     """Sync contacts between dashboard and Google Sheets"""
     from auth.session_manager import get_credentials_for_coach
+    from starlette.responses import JSONResponse
     
     try:
+        coach_id = request.path_params.get('coach_id')
         credentials = get_credentials_for_coach(coach_id)
         if not credentials:
             return {
