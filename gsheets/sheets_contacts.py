@@ -406,16 +406,17 @@ class SheetsContactManager:
         return False
 
 
-# HTTP endpoint handlers for the MCP server
+# MCP Tool handlers for the Google Workspace MCP server
 
-@server.custom_route('/coach/{coach_id}/sheets-contacts', methods=['GET'])
-async def get_sheets_contacts(request):
+@server.tool()
+async def sheets_contacts_list(
+    coach_id: str,
+    session: Optional[str] = None
+) -> Dict[str, Any]:
     """Get all contacts from coach's Google Sheet"""
     from auth.session_manager import get_credentials_for_coach
-    from starlette.responses import JSONResponse
     
     try:
-        coach_id = request.path_params.get('coach_id')
         credentials = get_credentials_for_coach(coach_id)
         if not credentials:
             return {
@@ -443,14 +444,16 @@ async def get_sheets_contacts(request):
         }
 
 
-@server.custom_route('/coach/{coach_id}/sheets-contacts', methods=['POST'])
-async def add_sheets_contact(request):
+@server.tool()
+async def sheets_contacts_add(
+    coach_id: str,
+    contact_data: Dict[str, Any],
+    session: Optional[str] = None
+) -> Dict[str, Any]:
     """Add a new contact to coach's Google Sheet"""
     from auth.session_manager import get_credentials_for_coach
-    from starlette.responses import JSONResponse
     
     try:
-        coach_id = request.path_params.get('coach_id')
         credentials = get_credentials_for_coach(coach_id)
         if not credentials:
             return {
@@ -458,8 +461,6 @@ async def add_sheets_contact(request):
                 'error': 'No Google account connected',
                 'requiresAuth': True
             }
-        
-        contact_data = await request.json()
         
         manager = SheetsContactManager(credentials)
         spreadsheet_id = manager.find_or_create_sheet(coach_id)
@@ -479,8 +480,13 @@ async def add_sheets_contact(request):
         }
 
 
-@server.custom_route('/coach/{coach_id}/sheets-contacts/{contact_id}', methods=['PUT'])
-async def update_sheets_contact(request):
+@server.tool()
+async def sheets_contacts_update(
+    coach_id: str,
+    contact_id: str,
+    updates: Dict[str, Any],
+    session: Optional[str] = None
+) -> Dict[str, Any]:
     """Update a contact in coach's Google Sheet"""
     from auth.session_manager import get_credentials_for_coach
     
@@ -492,8 +498,6 @@ async def update_sheets_contact(request):
                 'error': 'No Google account connected',
                 'requiresAuth': True
             }
-        
-        updates = await request.json()
         
         manager = SheetsContactManager(credentials)
         spreadsheet_id = manager.find_or_create_sheet(coach_id)
@@ -513,8 +517,12 @@ async def update_sheets_contact(request):
         }
 
 
-@server.custom_route('/coach/{coach_id}/sheets-contacts/{contact_id}', methods=['DELETE'])
-async def delete_sheets_contact(request):
+@server.tool()
+async def sheets_contacts_delete(
+    coach_id: str,
+    contact_id: str,
+    session: Optional[str] = None
+) -> Dict[str, Any]:
     """Delete a contact from coach's Google Sheet"""
     from auth.session_manager import get_credentials_for_coach
     
@@ -544,14 +552,16 @@ async def delete_sheets_contact(request):
         }
 
 
-@server.custom_route('/coach/{coach_id}/init-sheets-contacts', methods=['POST'])
-async def init_sheets_contacts(request):
+@server.tool()
+async def sheets_contacts_init(
+    coach_id: str,
+    sheet_name: Optional[str] = None,
+    session: Optional[str] = None
+) -> Dict[str, Any]:
     """Initialize Google Sheet for coach's contacts"""
     from auth.session_manager import get_credentials_for_coach
-    from starlette.responses import JSONResponse
     
     try:
-        coach_id = request.path_params.get('coach_id')
         credentials = get_credentials_for_coach(coach_id)
         if not credentials:
             return {
@@ -559,9 +569,6 @@ async def init_sheets_contacts(request):
                 'error': 'No Google account connected',
                 'requiresAuth': True
             }
-        
-        body = await request.json()
-        sheet_name = body.get('sheetName')
         
         manager = SheetsContactManager(credentials)
         spreadsheet_id = manager.find_or_create_sheet(coach_id, sheet_name)
@@ -604,14 +611,16 @@ async def init_sheets_contacts(request):
         }
 
 
-@server.custom_route('/coach/{coach_id}/sync-sheets-contacts', methods=['POST'])
-async def sync_sheets_contacts(request):
+@server.tool()
+async def sheets_contacts_sync(
+    coach_id: str,
+    dashboard_contacts: Optional[List[Dict[str, Any]]] = None,
+    session: Optional[str] = None
+) -> Dict[str, Any]:
     """Sync contacts between dashboard and Google Sheets"""
     from auth.session_manager import get_credentials_for_coach
-    from starlette.responses import JSONResponse
     
     try:
-        coach_id = request.path_params.get('coach_id')
         credentials = get_credentials_for_coach(coach_id)
         if not credentials:
             return {
@@ -620,8 +629,8 @@ async def sync_sheets_contacts(request):
                 'requiresAuth': True
             }
         
-        body = await request.json()
-        dashboard_contacts = body.get('contacts', [])
+        if dashboard_contacts is None:
+            dashboard_contacts = []
         
         manager = SheetsContactManager(credentials)
         spreadsheet_id = manager.find_or_create_sheet(coach_id)
