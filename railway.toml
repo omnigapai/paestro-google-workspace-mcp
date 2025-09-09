@@ -5,7 +5,7 @@ id = "paestro-google-workspace-mcp"
 name = "production"
 
 [deploy]
-startCommand = "python fastmcp_server.py --transport streamable-http --tools sheets"
+startCommand = "python main.py --transport streamable-http --tools sheets"
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
