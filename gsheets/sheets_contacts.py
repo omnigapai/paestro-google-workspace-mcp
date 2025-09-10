@@ -774,13 +774,26 @@ async def coach_sheets_contacts(request):
         
         # Get credentials from session store
         store = OAuth21SessionStore()
+        
+        # Debug logging
+        logger.info(f"Attempting to retrieve credentials for session ID: {session_id}")
+        logger.info(f"Coach ID: {coach_id}")
+        
         credentials = store.get_credentials_by_mcp_session(session_id)
         if not credentials:
+            # Log available sessions for debugging
+            logger.warning(f"No credentials found for session ID: {session_id}")
+            logger.info(f"Available MCP sessions: {list(store._mcp_session_mapping.keys())}")
+            
             return JSONResponse(
                 content={
                     'success': False,
                     'error': 'No Google account connected',
-                    'requiresAuth': True
+                    'requiresAuth': True,
+                    'debug': {
+                        'session_id': session_id,
+                        'available_sessions': list(store._mcp_session_mapping.keys()) if hasattr(store, '_mcp_session_mapping') else []
+                    }
                 },
                 status_code=401,
                 headers={"Access-Control-Allow-Origin": "*"}
@@ -869,13 +882,26 @@ async def coach_sheets_contact_detail(request):
         
         # Get credentials from session store
         store = OAuth21SessionStore()
+        
+        # Debug logging
+        logger.info(f"Attempting to retrieve credentials for session ID: {session_id}")
+        logger.info(f"Coach ID: {coach_id}")
+        
         credentials = store.get_credentials_by_mcp_session(session_id)
         if not credentials:
+            # Log available sessions for debugging
+            logger.warning(f"No credentials found for session ID: {session_id}")
+            logger.info(f"Available MCP sessions: {list(store._mcp_session_mapping.keys())}")
+            
             return JSONResponse(
                 content={
                     'success': False,
                     'error': 'No Google account connected',
-                    'requiresAuth': True
+                    'requiresAuth': True,
+                    'debug': {
+                        'session_id': session_id,
+                        'available_sessions': list(store._mcp_session_mapping.keys()) if hasattr(store, '_mcp_session_mapping') else []
+                    }
                 },
                 status_code=401,
                 headers={"Access-Control-Allow-Origin": "*"}
@@ -960,13 +986,26 @@ async def coach_init_sheets_contacts(request):
         
         # Get credentials from session store
         store = OAuth21SessionStore()
+        
+        # Debug logging
+        logger.info(f"Attempting to retrieve credentials for session ID: {session_id}")
+        logger.info(f"Coach ID: {coach_id}")
+        
         credentials = store.get_credentials_by_mcp_session(session_id)
         if not credentials:
+            # Log available sessions for debugging
+            logger.warning(f"No credentials found for session ID: {session_id}")
+            logger.info(f"Available MCP sessions: {list(store._mcp_session_mapping.keys())}")
+            
             return JSONResponse(
                 content={
                     'success': False,
                     'error': 'No Google account connected',
-                    'requiresAuth': True
+                    'requiresAuth': True,
+                    'debug': {
+                        'session_id': session_id,
+                        'available_sessions': list(store._mcp_session_mapping.keys()) if hasattr(store, '_mcp_session_mapping') else []
+                    }
                 },
                 status_code=401,
                 headers={"Access-Control-Allow-Origin": "*"}
