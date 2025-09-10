@@ -11,6 +11,8 @@ import aiohttp
 from typing import Dict, Any, Optional
 from datetime import datetime
 import logging
+import pickle
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +30,11 @@ class InterServiceClient:
         self.service_name = service_name
         self.service_key = os.getenv('GOOGLE_WORKSPACE_SERVICE_KEY', 'gw-secret-key-default')
         self.session = None
+        
+        # Setup token cache directory
+        self.cache_dir = Path('/tmp/google-workspace-mcp-cache')
+        self.cache_dir.mkdir(exist_ok=True)
+        self.token_cache_file = self.cache_dir / 'oauth_tokens.json'
         
     async def __aenter__(self):
         """Async context manager entry"""
@@ -110,7 +117,7 @@ class InterServiceClient:
     ) -> Dict[str, Any]:
         """
         Store OAuth tokens directly in Main MCP's Supabase
-        This bypasses the Orchestrator for better performance
+        AND cache them locally for reuse
         
         Args:
             tokens: OAuth token data from Google
@@ -122,7 +129,8 @@ class InterServiceClient:
         """
         logger.info(f"Storing OAuth tokens for coach {coach_id[:8]}... directly to Main MCP")
         
-        return await self.call_service(
+        # Store to Supabase via Main MCP
+        result = await self.call_service(
             target_service='main-platform',
             endpoint='/internal/store-oauth-tokens',
             method='POST',
@@ -133,6 +141,87 @@ class InterServiceClient:
             }
         )
         
+        # Cache tokens locally for this coach
+        if result.get('success'):
+            await self._cache_tokens(coach_id, coach_email, tokens)
+            logger.info(f"Cached OAuth tokens locally for coach {coach_id[:8]}...")
+        
+        return result
+        
+    async def _cache_tokens(self, coach_id: str, coach_email: str, tokens: Dict[str, Any]):
+        """
+        Cache tokens locally in a JSON file
+        
+        Args:
+            coach_id: Coach UUID
+            coach_email: Coach email address
+            tokens: OAuth token data
+        """
+        try:
+            # Load existing cache
+            cache = {}
+            if self.token_cache_file.exists():
+                with open(self.token_cache_file, 'r') as f:
+                    cache = json.load(f)
+            
+            # Update cache with new tokens
+            cache[coach_id] = {
+                'email': coach_email,
+                'tokens': tokens,
+                'cached_at': datetime.utcnow().isoformat()
+            }
+            
+            # Save updated cache
+            with open(self.token_cache_file, 'w') as f:
+                json.dump(cache, f, indent=2)
+                
+        except Exception as e:
+            logger.error(f"Failed to cache tokens: {e}")
+    
+    async def get_oauth_tokens(self, coach_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve OAuth tokens from local cache or Supabase
+        
+        Args:
+            coach_id: Coach UUID
+            
+        Returns:
+            OAuth tokens if found, None otherwise
+        """
+        # First check local cache
+        try:
+            if self.token_cache_file.exists():
+                with open(self.token_cache_file, 'r') as f:
+                    cache = json.load(f)
+                    if coach_id in cache:
+                        logger.info(f"Found cached OAuth tokens for coach {coach_id[:8]}...")
+                        return cache[coach_id]['tokens']
+        except Exception as e:
+            logger.error(f"Error reading token cache: {e}")
+        
+        # If not in cache, fetch from Supabase via Main MCP
+        logger.info(f"No cached tokens, fetching from Supabase for coach {coach_id[:8]}...")
+        try:
+            result = await self.call_service(
+                target_service='main-platform',
+                endpoint=f'/internal/get-oauth-tokens/{coach_id}',
+                method='GET'
+            )
+            
+            if result.get('success') and result.get('tokens'):
+                # Cache the retrieved tokens
+                await self._cache_tokens(
+                    coach_id, 
+                    result.get('email', ''),
+                    result['tokens']
+                )
+                return result['tokens']
+                
+        except Exception as e:
+            logger.error(f"Failed to retrieve OAuth tokens from Supabase: {e}")
+        
+        return None
+    
     async def get_coach_context(self, coach_id: str) -> Dict[str, Any]:
         """
         Get coach context directly from Main MCP

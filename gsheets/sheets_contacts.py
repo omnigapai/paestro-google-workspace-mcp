@@ -732,5 +732,295 @@ async def sheets_contacts_sync(request):
         }
 
 
+# Additional REST-style endpoints for coach-specific routes
+
+@server.custom_route("/coach/{coach_id}/sheets-contacts", ["GET", "POST", "OPTIONS"])
+async def coach_sheets_contacts(request):
+    """GET: List all contacts, POST: Add new contact for specific coach"""
+    import json
+    from fastapi.responses import JSONResponse
+    from auth.oauth21_session_store import OAuth21SessionStore
+    
+    # Handle CORS preflight
+    if request.method == "OPTIONS":
+        return JSONResponse(content={}, headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, session-id"
+        })
+    
+    try:
+        # Extract coach_id from path
+        coach_id = request.path_params.get('coach_id')
+        if not coach_id:
+            return JSONResponse(
+                content={'success': False, 'error': 'Coach ID required'},
+                status_code=400,
+                headers={"Access-Control-Allow-Origin": "*"}
+            )
+        
+        # Get session ID from headers
+        session_id = request.headers.get('session-id')
+        if not session_id:
+            return JSONResponse(
+                content={
+                    'success': False,
+                    'error': 'No session ID provided',
+                    'requiresAuth': True
+                },
+                status_code=401,
+                headers={"Access-Control-Allow-Origin": "*"}
+            )
+        
+        # Get credentials from session store
+        store = OAuth21SessionStore()
+        credentials = store.get_credentials_by_mcp_session(session_id)
+        if not credentials:
+            return JSONResponse(
+                content={
+                    'success': False,
+                    'error': 'No Google account connected',
+                    'requiresAuth': True
+                },
+                status_code=401,
+                headers={"Access-Control-Allow-Origin": "*"}
+            )
+        
+        manager = SheetsContactManager(credentials)
+        spreadsheet_id = manager.find_or_create_sheet(coach_id)
+        
+        if request.method == "GET":
+            # List all contacts
+            contacts = manager.get_all_contacts(spreadsheet_id)
+            return JSONResponse(
+                content={
+                    'success': True,
+                    'contacts': contacts,
+                    'total': len(contacts),
+                    'spreadsheet_id': spreadsheet_id
+                },
+                headers={"Access-Control-Allow-Origin": "*"}
+            )
+        
+        elif request.method == "POST":
+            # Add new contact
+            body = await request.body()
+            data = json.loads(body) if body else {}
+            contact_data = data.get('contact_data', data)  # Support both formats
+            
+            contact = manager.add_contact(spreadsheet_id, contact_data)
+            return JSONResponse(
+                content={
+                    'success': True,
+                    'contact': contact,
+                    'message': f"Contact '{contact.get('name', 'Unknown')}' added successfully"
+                },
+                headers={"Access-Control-Allow-Origin": "*"}
+            )
+        
+    except Exception as e:
+        logger.error(f"Error in coach sheets contacts endpoint: {e}")
+        return JSONResponse(
+            content={'success': False, 'error': str(e)},
+            status_code=500,
+            headers={"Access-Control-Allow-Origin": "*"}
+        )
+
+
+@server.custom_route("/coach/{coach_id}/sheets-contacts/{contact_id}", ["PUT", "DELETE", "OPTIONS"])
+async def coach_sheets_contact_detail(request):
+    """PUT: Update contact, DELETE: Delete contact for specific coach"""
+    import json
+    from fastapi.responses import JSONResponse
+    from auth.oauth21_session_store import OAuth21SessionStore
+    
+    # Handle CORS preflight
+    if request.method == "OPTIONS":
+        return JSONResponse(content={}, headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "PUT, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, session-id"
+        })
+    
+    try:
+        # Extract path parameters
+        coach_id = request.path_params.get('coach_id')
+        contact_id = request.path_params.get('contact_id')
+        
+        if not coach_id or not contact_id:
+            return JSONResponse(
+                content={'success': False, 'error': 'Coach ID and Contact ID required'},
+                status_code=400,
+                headers={"Access-Control-Allow-Origin": "*"}
+            )
+        
+        # Get session ID from headers
+        session_id = request.headers.get('session-id')
+        if not session_id:
+            return JSONResponse(
+                content={
+                    'success': False,
+                    'error': 'No session ID provided',
+                    'requiresAuth': True
+                },
+                status_code=401,
+                headers={"Access-Control-Allow-Origin": "*"}
+            )
+        
+        # Get credentials from session store
+        store = OAuth21SessionStore()
+        credentials = store.get_credentials_by_mcp_session(session_id)
+        if not credentials:
+            return JSONResponse(
+                content={
+                    'success': False,
+                    'error': 'No Google account connected',
+                    'requiresAuth': True
+                },
+                status_code=401,
+                headers={"Access-Control-Allow-Origin": "*"}
+            )
+        
+        manager = SheetsContactManager(credentials)
+        spreadsheet_id = manager.find_or_create_sheet(coach_id)
+        
+        if request.method == "PUT":
+            # Update contact
+            body = await request.body()
+            data = json.loads(body) if body else {}
+            updates = data.get('updates', data)  # Support both formats
+            
+            contact = manager.update_contact(spreadsheet_id, contact_id, updates)
+            return JSONResponse(
+                content={
+                    'success': True,
+                    'contact': contact,
+                    'message': 'Contact updated successfully'
+                },
+                headers={"Access-Control-Allow-Origin": "*"}
+            )
+        
+        elif request.method == "DELETE":
+            # Delete contact
+            success = manager.delete_contact(spreadsheet_id, contact_id)
+            return JSONResponse(
+                content={
+                    'success': success,
+                    'message': 'Contact deleted successfully'
+                },
+                headers={"Access-Control-Allow-Origin": "*"}
+            )
+        
+    except Exception as e:
+        logger.error(f"Error in coach sheets contact detail endpoint: {e}")
+        return JSONResponse(
+            content={'success': False, 'error': str(e)},
+            status_code=500,
+            headers={"Access-Control-Allow-Origin": "*"}
+        )
+
+
+@server.custom_route("/coach/{coach_id}/init-sheets-contacts", ["POST", "OPTIONS"])
+async def coach_init_sheets_contacts(request):
+    """Initialize Google Sheet for coach's contacts"""
+    import json
+    from fastapi.responses import JSONResponse
+    from auth.oauth21_session_store import OAuth21SessionStore
+    
+    # Handle CORS preflight
+    if request.method == "OPTIONS":
+        return JSONResponse(content={}, headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, session-id"
+        })
+    
+    try:
+        # Extract coach_id from path
+        coach_id = request.path_params.get('coach_id')
+        if not coach_id:
+            return JSONResponse(
+                content={'success': False, 'error': 'Coach ID required'},
+                status_code=400,
+                headers={"Access-Control-Allow-Origin": "*"}
+            )
+        
+        # Get session ID from headers
+        session_id = request.headers.get('session-id')
+        if not session_id:
+            return JSONResponse(
+                content={
+                    'success': False,
+                    'error': 'No session ID provided',
+                    'requiresAuth': True
+                },
+                status_code=401,
+                headers={"Access-Control-Allow-Origin": "*"}
+            )
+        
+        # Get credentials from session store
+        store = OAuth21SessionStore()
+        credentials = store.get_credentials_by_mcp_session(session_id)
+        if not credentials:
+            return JSONResponse(
+                content={
+                    'success': False,
+                    'error': 'No Google account connected',
+                    'requiresAuth': True
+                },
+                status_code=401,
+                headers={"Access-Control-Allow-Origin": "*"}
+            )
+        
+        # Get optional sheet name from request body
+        body = await request.body()
+        data = json.loads(body) if body else {}
+        sheet_name = data.get('sheet_name')
+        
+        manager = SheetsContactManager(credentials)
+        spreadsheet_id = manager.find_or_create_sheet(coach_id, sheet_name)
+        
+        # Add some example contacts for testing
+        example_contacts = [
+            {
+                'name': 'John Smith',
+                'email': 'john.smith@example.com',
+                'phone': '(555) 123-4567',
+                'role': 'Parent',
+                'organization': 'Team Eagles',
+                'notes': 'Parent of Tommy Smith'
+            },
+            {
+                'name': 'Sarah Johnson',
+                'email': 'sarah.j@example.com', 
+                'phone': '(555) 987-6543',
+                'role': 'Student',
+                'organization': 'Team Eagles',
+                'notes': 'Pitcher, #12'
+            }
+        ]
+        
+        for contact in example_contacts:
+            manager.add_contact(spreadsheet_id, contact)
+        
+        return JSONResponse(
+            content={
+                'success': True,
+                'spreadsheet_id': spreadsheet_id,
+                'message': 'Google Sheets contact database initialized successfully',
+                'sheet_url': f'https://docs.google.com/spreadsheets/d/{spreadsheet_id}'
+            },
+            headers={"Access-Control-Allow-Origin": "*"}
+        )
+        
+    except Exception as e:
+        logger.error(f"Error initializing coach sheets contacts: {e}")
+        return JSONResponse(
+            content={'success': False, 'error': str(e)},
+            status_code=500,
+            headers={"Access-Control-Allow-Origin": "*"}
+        )
+
+
 # Register all HTTP routes
-logger.info("Google Sheets contact management HTTP routes initialized")
+logger.info("Google Sheets contact management HTTP routes initialized (including REST-style coach endpoints)")

@@ -207,6 +207,7 @@ def main():
         import json
         import aiohttp
         from urllib.parse import urlencode
+        from core.inter_service_client import InterServiceClient
         
         @server.custom_route("/oauth/exchange", methods=["POST", "OPTIONS"])
         async def oauth_exchange_with_coach(request: Request):
@@ -271,6 +272,20 @@ def main():
                                 }
                             )
                         
+                        # Store tokens in Supabase AND cache locally if coach info provided
+                        storage_result = None
+                        if coach_id and coach_email:
+                            try:
+                                inter_service_client = InterServiceClient()
+                                storage_result = await inter_service_client.store_oauth_tokens(
+                                    tokens=tokens,
+                                    coach_id=coach_id,
+                                    coach_email=coach_email
+                                )
+                                logger.info(f"Stored and cached OAuth tokens for coach {coach_id[:8]}...")
+                            except Exception as e:
+                                logger.error(f"Failed to store OAuth tokens: {e}")
+                        
                         # Return tokens to Orchestrator
                         return JSONResponse(
                             content={
@@ -279,7 +294,8 @@ def main():
                                 "refresh_token": tokens.get("refresh_token"),
                                 "expiry_date": tokens.get("expires_in"),
                                 "token_type": tokens.get("token_type", "Bearer"),
-                                "storage": "orchestrator"
+                                "storage": "cached_and_supabase" if storage_result else "orchestrator",
+                                "storage_result": storage_result
                             },
                             headers={
                                 "Access-Control-Allow-Origin": "*",
@@ -298,6 +314,110 @@ def main():
                         "Access-Control-Allow-Methods": "POST, OPTIONS",
                         "Access-Control-Allow-Headers": "Content-Type"
                     }
+                )
+        
+        @server.custom_route("/sheets/create-contacts", methods=["POST", "OPTIONS"])
+        async def create_contacts_sheet(request: Request):
+            """Create a Google Sheets contact sheet for a coach using cached tokens"""
+            
+            # Handle CORS preflight
+            if request.method == "OPTIONS":
+                return JSONResponse(content={}, headers={
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "POST, OPTIONS",
+                    "Access-Control-Allow-Headers": "Content-Type"
+                })
+            
+            try:
+                # Get the request body
+                body = await request.body()
+                data = json.loads(body) if body else {}
+                
+                coach_id = data.get('coachId')
+                coach_email = data.get('coachEmail')
+                organization_name = data.get('organizationName', 'Organization')
+                coach_name = data.get('coachName', 'Coach')
+                
+                if not coach_id:
+                    return JSONResponse(
+                        content={"success": False, "error": "Missing coach ID"},
+                        status_code=400,
+                        headers={"Access-Control-Allow-Origin": "*"}
+                    )
+                
+                # Get cached OAuth tokens
+                inter_service_client = InterServiceClient()
+                tokens = await inter_service_client.get_oauth_tokens(coach_id)
+                
+                if not tokens:
+                    # No cached tokens, user needs to authenticate
+                    return JSONResponse(
+                        content={
+                            "success": False, 
+                            "error": "No OAuth tokens found. Please connect to Google Workspace first.",
+                            "requiresAuth": True
+                        },
+                        status_code=401,
+                        headers={"Access-Control-Allow-Origin": "*"}
+                    )
+                
+                # Create credentials from cached tokens
+                from google.oauth2.credentials import Credentials
+                creds = Credentials(
+                    token=tokens.get('access_token'),
+                    refresh_token=tokens.get('refresh_token'),
+                    token_uri='https://oauth2.googleapis.com/token',
+                    client_id=os.getenv('GOOGLE_OAUTH_CLIENT_ID'),
+                    client_secret=os.getenv('GOOGLE_OAUTH_CLIENT_SECRET')
+                )
+                
+                # Create the contact sheet
+                from gsheets.sheets_contacts import SheetsContactManager
+                from googleapiclient.errors import HttpError
+                manager = SheetsContactManager(creds)
+                
+                # Generate sheet name
+                sheet_name = f"{organization_name} {coach_name} Contacts"
+                
+                try:
+                    sheet_id = manager.find_or_create_sheet(coach_id, sheet_name)
+                    
+                    # Get sheet URL
+                    sheet_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/edit"
+                    
+                    logger.info(f"Created contact sheet for coach {coach_id}: {sheet_url}")
+                    
+                    return JSONResponse(
+                        content={
+                            "success": True,
+                            "sheetId": sheet_id,
+                            "sheetUrl": sheet_url,
+                            "sheetName": sheet_name
+                        },
+                        headers={"Access-Control-Allow-Origin": "*"}
+                    )
+                    
+                except HttpError as e:
+                    if e.resp.status == 401:
+                        # Token expired, needs refresh
+                        return JSONResponse(
+                            content={
+                                "success": False,
+                                "error": "OAuth token expired. Please reconnect to Google Workspace.",
+                                "requiresAuth": True
+                            },
+                            status_code=401,
+                            headers={"Access-Control-Allow-Origin": "*"}
+                        )
+                    else:
+                        raise
+                        
+            except Exception as e:
+                logger.error(f"Error creating contact sheet: {e}")
+                return JSONResponse(
+                    content={"success": False, "error": str(e)},
+                    status_code=500,
+                    headers={"Access-Control-Allow-Origin": "*"}
                 )
 
     safe_print("📊 Configuration Summary:")
