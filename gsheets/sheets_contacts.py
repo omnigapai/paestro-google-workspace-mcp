@@ -406,6 +406,83 @@ class SheetsContactManager:
         return False
 
 
+# Add custom route for coach-specific endpoint that orchestrator calls
+@server.custom_route("/coach/{coach_id}/init-sheets-contacts", ["POST"])
+async def coach_init_sheets_contacts(request, coach_id: str):
+    """Initialize Google Sheet for coach's contacts - called by orchestrator"""
+    import json
+    import asyncio
+    from core.inter_service_client import InterServiceClient
+    from google.oauth2.credentials import Credentials
+    import os
+    
+    data = json.loads(request.body) if request.body else {}
+    sheet_name = data.get('sheetName') or data.get('sheet_name')
+    
+    try:
+        # Get OAuth tokens from Supabase via InterServiceClient
+        inter_service_client = InterServiceClient()
+        tokens = await inter_service_client.get_oauth_tokens(coach_id)
+        
+        if not tokens:
+            # No tokens found in Supabase, user needs to authenticate
+            logger.info(f"No OAuth tokens found for coach {coach_id[:8]}...")
+            return {
+                'success': False,
+                'error': 'No Google account connected. Please connect to Google Workspace first.',
+                'requiresAuth': True,
+                'coach_id': coach_id
+            }
+        
+        # Create credentials from stored tokens
+        credentials = Credentials(
+            token=tokens.get('access_token'),
+            refresh_token=tokens.get('refresh_token'),
+            token_uri='https://oauth2.googleapis.com/token',
+            client_id=os.getenv('GOOGLE_OAUTH_CLIENT_ID'),
+            client_secret=os.getenv('GOOGLE_OAUTH_CLIENT_SECRET')
+        )
+        
+        manager = SheetsContactManager(credentials)
+        spreadsheet_id = manager.find_or_create_sheet(coach_id, sheet_name)
+        
+        # Add some example contacts for testing
+        example_contacts = [
+            {
+                'name': 'John Smith',
+                'email': 'john.smith@example.com',
+                'phone': '(555) 123-4567',
+                'role': 'Parent',
+                'organization': 'Team Eagles',
+                'notes': 'Parent of Tommy Smith'
+            },
+            {
+                'name': 'Sarah Johnson',
+                'email': 'sarah.j@example.com', 
+                'phone': '(555) 987-6543',
+                'role': 'Student',
+                'organization': 'Team Eagles',
+                'notes': 'Pitcher, #12'
+            }
+        ]
+        
+        for contact in example_contacts:
+            manager.add_contact(spreadsheet_id, contact)
+        
+        return {
+            'success': True,
+            'spreadsheet_id': spreadsheet_id,
+            'message': 'Google Sheets contact database initialized successfully',
+            'sheet_url': f'https://docs.google.com/spreadsheets/d/{spreadsheet_id}'
+        }
+        
+    except Exception as e:
+        logger.error(f"Error initializing sheets contacts for coach {coach_id}: {e}")
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
 # HTTP Route handlers for the Google Workspace MCP server
 
 @server.custom_route("/sheets-contacts/list", ["POST"])
@@ -415,21 +492,21 @@ async def sheets_contacts_list(request):
     data = json.loads(request.body) if request.body else {}
     coach_id = data.get('coach_id')
     session = data.get('session')
-    from auth.oauth21_session_store import OAuth21SessionStore
+    from core.inter_service_client import InterServiceClient
     
     try:
-        # Get session ID from headers
-        session_id = request.headers.get('session-id')
-        if not session_id:
+        # Get coach_id from request
+        if not coach_id:
             return {
                 'success': False,
-                'error': 'No session ID provided',
+                'error': 'No coach ID provided',
                 'requiresAuth': True
             }
         
         # Get credentials from session store
-        store = OAuth21SessionStore()
-        credentials = store.get_credentials_by_mcp_session(session_id)
+        inter_service_client = InterServiceClient()
+        tokens = await inter_service_client.get_oauth_tokens(coach_id)
+        credentials = tokens
         if not credentials:
             return {
                 'success': False,
@@ -464,21 +541,21 @@ async def sheets_contacts_add(request):
     coach_id = data.get('coach_id')
     contact_data = data.get('contact_data', {})
     session = data.get('session')
-    from auth.oauth21_session_store import OAuth21SessionStore
+    from core.inter_service_client import InterServiceClient
     
     try:
-        # Get session ID from headers
-        session_id = request.headers.get('session-id')
-        if not session_id:
+        # Get coach_id from request
+        if not coach_id:
             return {
                 'success': False,
-                'error': 'No session ID provided',
+                'error': 'No coach ID provided',
                 'requiresAuth': True
             }
         
         # Get credentials from session store
-        store = OAuth21SessionStore()
-        credentials = store.get_credentials_by_mcp_session(session_id)
+        inter_service_client = InterServiceClient()
+        tokens = await inter_service_client.get_oauth_tokens(coach_id)
+        credentials = tokens
         if not credentials:
             return {
                 'success': False,
@@ -513,21 +590,21 @@ async def sheets_contacts_update(request):
     contact_id = data.get('contact_id')
     updates = data.get('updates', {})
     session = data.get('session')
-    from auth.oauth21_session_store import OAuth21SessionStore
+    from core.inter_service_client import InterServiceClient
     
     try:
-        # Get session ID from headers
-        session_id = request.headers.get('session-id')
-        if not session_id:
+        # Get coach_id from request
+        if not coach_id:
             return {
                 'success': False,
-                'error': 'No session ID provided',
+                'error': 'No coach ID provided',
                 'requiresAuth': True
             }
         
         # Get credentials from session store
-        store = OAuth21SessionStore()
-        credentials = store.get_credentials_by_mcp_session(session_id)
+        inter_service_client = InterServiceClient()
+        tokens = await inter_service_client.get_oauth_tokens(coach_id)
+        credentials = tokens
         if not credentials:
             return {
                 'success': False,
@@ -561,21 +638,21 @@ async def sheets_contacts_delete(request):
     coach_id = data.get('coach_id')
     contact_id = data.get('contact_id')
     session = data.get('session')
-    from auth.oauth21_session_store import OAuth21SessionStore
+    from core.inter_service_client import InterServiceClient
     
     try:
-        # Get session ID from headers
-        session_id = request.headers.get('session-id')
-        if not session_id:
+        # Get coach_id from request
+        if not coach_id:
             return {
                 'success': False,
-                'error': 'No session ID provided',
+                'error': 'No coach ID provided',
                 'requiresAuth': True
             }
         
         # Get credentials from session store
-        store = OAuth21SessionStore()
-        credentials = store.get_credentials_by_mcp_session(session_id)
+        inter_service_client = InterServiceClient()
+        tokens = await inter_service_client.get_oauth_tokens(coach_id)
+        credentials = tokens
         if not credentials:
             return {
                 'success': False,
@@ -604,31 +681,52 @@ async def sheets_contacts_delete(request):
 async def sheets_contacts_init(request):
     """Initialize Google Sheet for coach's contacts"""
     import json
+    import asyncio
+    from core.inter_service_client import InterServiceClient
+    from google.oauth2.credentials import Credentials
+    import os
+    
     data = json.loads(request.body) if request.body else {}
     coach_id = data.get('coach_id')
     sheet_name = data.get('sheet_name')
     session = data.get('session')
-    from auth.oauth21_session_store import OAuth21SessionStore
     
     try:
-        # Get session ID from headers
-        session_id = request.headers.get('session-id')
-        if not session_id:
+        # Try to get coach ID from the request (passed from orchestrator)
+        if not coach_id:
+            # Extract from path if available
+            path_parts = request.url.path.split('/')
+            if len(path_parts) >= 3 and path_parts[1] == 'coach':
+                coach_id = path_parts[2]
+        
+        if not coach_id:
             return {
                 'success': False,
-                'error': 'No session ID provided',
+                'error': 'No coach ID provided',
                 'requiresAuth': True
             }
         
-        # Get credentials from session store
-        store = OAuth21SessionStore()
-        credentials = store.get_credentials_by_mcp_session(session_id)
-        if not credentials:
+        # Get OAuth tokens from Supabase via InterServiceClient
+        inter_service_client = InterServiceClient()
+        tokens = await inter_service_client.get_oauth_tokens(coach_id)
+        
+        if not tokens:
+            # No tokens found in Supabase, user needs to authenticate
+            logger.info(f"No OAuth tokens found for coach {coach_id[:8]}...")
             return {
                 'success': False,
                 'error': 'No Google account connected',
                 'requiresAuth': True
             }
+        
+        # Create credentials from stored tokens
+        credentials = Credentials(
+            token=tokens.get('access_token'),
+            refresh_token=tokens.get('refresh_token'),
+            token_uri='https://oauth2.googleapis.com/token',
+            client_id=os.getenv('GOOGLE_OAUTH_CLIENT_ID'),
+            client_secret=os.getenv('GOOGLE_OAUTH_CLIENT_SECRET')
+        )
         
         manager = SheetsContactManager(credentials)
         spreadsheet_id = manager.find_or_create_sheet(coach_id, sheet_name)
@@ -679,21 +777,21 @@ async def sheets_contacts_sync(request):
     coach_id = data.get('coach_id')
     dashboard_contacts = data.get('dashboard_contacts')
     session = data.get('session')
-    from auth.oauth21_session_store import OAuth21SessionStore
+    from core.inter_service_client import InterServiceClient
     
     try:
-        # Get session ID from headers
-        session_id = request.headers.get('session-id')
-        if not session_id:
+        # Get coach_id from request
+        if not coach_id:
             return {
                 'success': False,
-                'error': 'No session ID provided',
+                'error': 'No coach ID provided',
                 'requiresAuth': True
             }
         
         # Get credentials from session store
-        store = OAuth21SessionStore()
-        credentials = store.get_credentials_by_mcp_session(session_id)
+        inter_service_client = InterServiceClient()
+        tokens = await inter_service_client.get_oauth_tokens(coach_id)
+        credentials = tokens
         if not credentials:
             return {
                 'success': False,
@@ -739,7 +837,7 @@ async def coach_sheets_contacts(request):
     """GET: List all contacts, POST: Add new contact for specific coach"""
     import json
     from fastapi.responses import JSONResponse
-    from auth.oauth21_session_store import OAuth21SessionStore
+    from core.inter_service_client import InterServiceClient
     
     # Handle CORS preflight
     if request.method == "OPTIONS":
@@ -773,13 +871,14 @@ async def coach_sheets_contacts(request):
             )
         
         # Get credentials from session store
-        store = OAuth21SessionStore()
+        inter_service_client = InterServiceClient()
         
         # Debug logging
         logger.info(f"Attempting to retrieve credentials for session ID: {session_id}")
         logger.info(f"Coach ID: {coach_id}")
         
-        credentials = store.get_credentials_by_mcp_session(session_id)
+        tokens = await inter_service_client.get_oauth_tokens(coach_id)
+        credentials = tokens
         if not credentials:
             # Log available sessions for debugging
             logger.warning(f"No credentials found for session ID: {session_id}")
@@ -845,7 +944,7 @@ async def coach_sheets_contact_detail(request):
     """PUT: Update contact, DELETE: Delete contact for specific coach"""
     import json
     from fastapi.responses import JSONResponse
-    from auth.oauth21_session_store import OAuth21SessionStore
+    from core.inter_service_client import InterServiceClient
     
     # Handle CORS preflight
     if request.method == "OPTIONS":
@@ -881,13 +980,14 @@ async def coach_sheets_contact_detail(request):
             )
         
         # Get credentials from session store
-        store = OAuth21SessionStore()
+        inter_service_client = InterServiceClient()
         
         # Debug logging
         logger.info(f"Attempting to retrieve credentials for session ID: {session_id}")
         logger.info(f"Coach ID: {coach_id}")
         
-        credentials = store.get_credentials_by_mcp_session(session_id)
+        tokens = await inter_service_client.get_oauth_tokens(coach_id)
+        credentials = tokens
         if not credentials:
             # Log available sessions for debugging
             logger.warning(f"No credentials found for session ID: {session_id}")
@@ -951,7 +1051,7 @@ async def coach_init_sheets_contacts(request):
     """Initialize Google Sheet for coach's contacts"""
     import json
     from fastapi.responses import JSONResponse
-    from auth.oauth21_session_store import OAuth21SessionStore
+    from core.inter_service_client import InterServiceClient
     
     # Handle CORS preflight
     if request.method == "OPTIONS":
@@ -985,13 +1085,14 @@ async def coach_init_sheets_contacts(request):
             )
         
         # Get credentials from session store
-        store = OAuth21SessionStore()
+        inter_service_client = InterServiceClient()
         
         # Debug logging
         logger.info(f"Attempting to retrieve credentials for session ID: {session_id}")
         logger.info(f"Coach ID: {coach_id}")
         
-        credentials = store.get_credentials_by_mcp_session(session_id)
+        tokens = await inter_service_client.get_oauth_tokens(coach_id)
+        credentials = tokens
         if not credentials:
             # Log available sessions for debugging
             logger.warning(f"No credentials found for session ID: {session_id}")
