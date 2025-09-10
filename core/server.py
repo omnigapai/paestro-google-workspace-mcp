@@ -199,6 +199,9 @@ async def calendar_google_connect(request: Request):
 
 @server.custom_route("/oauth2callback", methods=["GET"])
 async def oauth2_callback(request: Request) -> HTMLResponse:
+    import base64
+    import json
+    
     state = request.query_params.get("state")
     code = request.query_params.get("code")
     error = request.query_params.get("error")
@@ -231,8 +234,21 @@ async def oauth2_callback(request: Request) -> HTMLResponse:
 
         try:
             store = get_oauth21_session_store()
+            
+            # Extract sessionId from state parameter if present
             mcp_session_id = None
-            if hasattr(request, 'state') and hasattr(request.state, 'session_id'):
+            if state:
+                try:
+                    # Decode the state parameter to extract sessionId
+                    state_data = json.loads(base64.b64decode(state).decode('utf-8'))
+                    mcp_session_id = state_data.get('sessionId')
+                    if mcp_session_id:
+                        logger.info(f"Extracted MCP session ID from state: {mcp_session_id}")
+                except Exception as e:
+                    logger.debug(f"Could not extract sessionId from state: {e}")
+            
+            # Also check request state
+            if not mcp_session_id and hasattr(request, 'state') and hasattr(request.state, 'session_id'):
                 mcp_session_id = request.state.session_id
 
             store.store_session(
@@ -247,7 +263,7 @@ async def oauth2_callback(request: Request) -> HTMLResponse:
                 session_id=f"google-{state}",
                 mcp_session_id=mcp_session_id,
             )
-            logger.info(f"Stored Google credentials in OAuth 2.1 session store for {verified_user_id}")
+            logger.info(f"Stored Google credentials in OAuth 2.1 session store for {verified_user_id} with MCP session: {mcp_session_id}")
         except Exception as e:
             logger.error(f"Failed to store credentials in OAuth 2.1 store: {e}")
 
